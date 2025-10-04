@@ -1,9 +1,10 @@
 package com.coding.challenge.domain.transaction.exceptions;
 
-public class InvalidTransactionException extends RuntimeException {
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 
-    public InvalidTransactionException(String message){
-        super(message);
-    }
-    
+@AllArgsConstructor
+@Getter
+public class InvalidTransactionException extends RuntimeException {
+    private InvalidTransactionCodes code;
 }

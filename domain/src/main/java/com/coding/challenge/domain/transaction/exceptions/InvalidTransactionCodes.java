@@ -6,8 +6,7 @@ import lombok.NoArgsConstructor;
 
 
 
-public enum InvalidTransactionExceptionCodes {
-    ERR_REPEATED_TRANSACTION,
+public enum InvalidTransactionCodes {
     ERR_NONEXISTENT_PARENT_TRANSACTION,
     ERR_NONEXISTENT_TYPE,
 }
