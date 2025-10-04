@@ -5,10 +5,15 @@ import java.math.BigDecimal;
 import java.util.Optional;
 import java.util.Set;
 
+import org.springframework.stereotype.Repository;
+
 import com.coding.challenge.domain.transaction.Transaction;
 import com.coding.challenge.domain.transaction.TransactionRepository;
 
+@Repository
 public class InMemoryTransactionRepository implements TransactionRepository {
+
+
 
 
     @Override

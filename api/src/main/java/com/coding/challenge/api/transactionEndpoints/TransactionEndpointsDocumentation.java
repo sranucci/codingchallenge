@@ -10,6 +10,8 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import com.coding.challenge.api.common.dtos.response.ErrorResponse;
@@ -20,8 +22,9 @@ import com.coding.challenge.api.transactionEndpoints.dtos.responses.GetTransacti
 import java.util.List;
 
 
-@RequestMapping("/transactions")
 @Tag(name = "Transactions", description = "Operations for managing transactions")
+@RequestMapping("/transactions")
+@Validated
 public interface TransactionEndpointsDocumentation {
 
     @Operation(
@@ -36,10 +39,13 @@ public interface TransactionEndpointsDocumentation {
             content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
                 schema = @Schema(implementation = ErrorResponse.class)))
     })
-    StatusOkResponse putTransaction(
+    @PutMapping("/{transactionId:\\d+}")
+    ResponseEntity<StatusOkResponse> putTransaction(
         @Parameter(description = "Unique transaction ID", example = "1001")
+        @PathVariable
         @Min(1) long transactionId,
-        @Valid @RequestBody PutTransactionRequest body
+        @Valid @RequestBody 
+        PutTransactionRequest body
     );
 
     @Operation(
@@ -54,9 +60,10 @@ public interface TransactionEndpointsDocumentation {
             content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
                 schema = @Schema(implementation = ErrorResponse.class)))
     })
-    List<Long> getTransactionIdsByType(
+    @GetMapping("types/{type}")
+    ResponseEntity<List<Long>> getTransactionIdsByType(
         @Parameter(description = "Transaction type", example = "cars")
-        @PathVariable("type")
+        @PathVariable
         @NotBlank @Size(max = 64) String type
     );
 
@@ -72,6 +79,7 @@ public interface TransactionEndpointsDocumentation {
             content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
                 schema = @Schema(implementation = ErrorResponse.class)))
     })
+    @GetMapping("/sum/{transactionId:\\d+}")
     GetTransactionSumResponse getSum(
         @Parameter(description = "Transaction ID to calculate sum for", example = "200")
         long transactionId

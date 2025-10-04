@@ -9,6 +9,8 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import lombok.AllArgsConstructor;
+
 import org.springframework.http.*;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -19,32 +21,44 @@ import com.coding.challenge.api.transactionEndpoints.dtos.responses.GetTransacti
 
 import java.util.List;
 
+
 @RestController
-@RequestMapping("/transactions")
-@Validated
 public class TransactionController implements TransactionEndpointsDocumentation {
 
 
 
-    @PutMapping("/{transaction_id}")
+
     @Override
-    public StatusOkResponse putTransaction( long transactionId, @Valid PutTransactionRequest body) {
+    public ResponseEntity<List<Long>> getTransactionIdsByType(String type) {
         // TODO Auto-generated method stub
-        return null;
+        throw new UnsupportedOperationException("Unimplemented method 'getTransactionIdsByType'");
+    }
+
+    @Override
+    public GetTransactionSumResponse getSum(long transactionId) {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException("Unimplemented method 'getSum'");
+    }
+
+    @Override
+    public ResponseEntity<StatusOkResponse> putTransaction(long transactionId,
+            PutTransactionRequest body) {
+        // TODO Auto-generated method stub
+        return ResponseEntity.ok(StatusOkResponse.ok());
     }
 
     
-    @GetMapping("/sum/{transaction_id}")
-    @Override
-    public GetTransactionSumResponse getSum(@PathVariable("transaction_id") @Min(1) long transactionId) {
-        // TODO Auto-generated method stub
-        return null;
-    }
+    // @GetMapping("/sum/{transaction_id}")
+    // @Override
+    // public GetTransactionSumResponse getSum(@PathVariable("transaction_id") @Min(1) long transactionId) {
+    //     // TODO Auto-generated method stub
+    //     return null;
+    // }
 
-    @GetMapping("/types/{type}")
-    @Override
-    public List<Long> getTransactionIdsByType(@NotBlank @Size(max = 64) String type) {
-        // TODO Auto-generated method stub
-        return null;
-    }
+    // @GetMapping("/types/{type}")
+    // @Override
+    // public List<Long> getTransactionIdsByType(@NotBlank @Size(max = 64) String type) {
+    //     // TODO Auto-generated method stub
+    //     return null;
+    // }
 }
