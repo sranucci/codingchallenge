@@ -153,7 +153,6 @@ public class InMemoryTransactionRepository implements TransactionRepository {
                         .orElse(null);
 
                 if (!Objects.equals(peekedOldParent, actualOldParent)) {
-                    releaseLocksInReverseOrder(acquiredLocks);
                     continue;
                 }
                 // Una vez que tenemos todos los mutex en forma ascendente podemos actualizar la
