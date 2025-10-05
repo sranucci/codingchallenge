@@ -56,14 +56,10 @@ class InMemoryTransactionRepositoryTests {
         void givenNonRepeatedTransaction_whenSaveTransaction_thenSaveSuccess() {
             Transaction tx = new Transaction(10L, "cars", new BigDecimal("5000"), null);
 
-            Transaction saved = repository.saveTransaction(tx);
+            Transaction oldTx = repository.saveTransaction(tx);
 
             // return value
-            assertNotNull(saved, "createTransaction should return the saved entity");
-            assertEquals(10L, saved.getId());
-            assertEquals("cars", saved.getType());
-            assertEquals(0, new BigDecimal("5000").compareTo(saved.getAmount()));
-            assertNull(saved.getParentTransactionId());
+            assertNull(oldTx);
 
             // confirm persistence
             Optional<Transaction> fetched = repository.findById(10L);
@@ -80,14 +76,11 @@ class InMemoryTransactionRepositoryTests {
 
             Transaction tx2 = new Transaction(10L, "shopping", new BigDecimal("7000"), null);
 
-            Transaction updated = repository.saveTransaction(tx2);
+            Transaction oldTx1 = repository.saveTransaction(tx2);
 
-            // return value
-            assertNotNull(updated, "updateTransaction should return the updated entity");
-            assertEquals(10L, updated.getId());
-            assertEquals("shopping", updated.getType(), "Type should be updated");
-            assertEquals(0, new BigDecimal("7000").compareTo(updated.getAmount()), "Amount should be updated");
-            assertNull(updated.getParentTransactionId());
+
+            assertEquals(tx1.getId(), oldTx1.getId());
+
 
             // confirm persistence
             Optional<Transaction> fetched = repository.findById(10L);
@@ -102,11 +95,9 @@ class InMemoryTransactionRepositoryTests {
             repository.saveTransaction(parent);
 
             Transaction child = new Transaction(101L, "shopping", new BigDecimal("7000"), 100L);
-            Transaction savedChild = repository.saveTransaction(child);
+            repository.saveTransaction(child);
 
-            assertNotNull(savedChild);
-            assertEquals(101L, savedChild.getId());
-            assertEquals(100L, savedChild.getParentTransactionId());
+    
 
             Optional<Transaction> fetched = repository.findById(101L);
             assertTrue(fetched.isPresent(), "Child should exist after insert");
@@ -122,8 +113,9 @@ class InMemoryTransactionRepositoryTests {
             repository.saveTransaction(child);
 
             Transaction childUpdate = new Transaction(101L, "shopping", new BigDecimal("7000"), 100L);
-            Transaction savedUpdate = repository.saveTransaction(childUpdate);
+            repository.saveTransaction(childUpdate);
 
+            Transaction savedUpdate = repository.findById(101L).get();
             assertNotNull(savedUpdate, "saveTransaction should return updated entity");
             assertEquals(101L, savedUpdate.getId());
             assertEquals("shopping", savedUpdate.getType());

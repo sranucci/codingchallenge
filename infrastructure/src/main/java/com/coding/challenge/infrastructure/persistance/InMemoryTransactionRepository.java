@@ -2,7 +2,12 @@ package com.coding.challenge.infrastructure.persistance;
 
 import java.math.BigDecimal;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Deque;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -24,34 +29,37 @@ import com.coding.challenge.infrastructure.common.ValidTransactionTypeProps;
 @Repository
 public class InMemoryTransactionRepository implements TransactionRepository {
 
-
+    private final Set<String> validTypes;
 
     public InMemoryTransactionRepository(ValidTransactionTypeProps props) {
         for (String type : props.allowedTypes()) {
             typesToTransaction.put(type, new HashSet<>());
         }
+        validTypes = Set.copyOf(props.allowedTypes());
     }
 
+    Map<Long, ReentrantLock> locksPerId = new ConcurrentHashMap<>();
     Map<Long, Transaction> idToTransaction = new ConcurrentHashMap<>();
     Map<String, Set<Long>> typesToTransaction = new ConcurrentHashMap<>();
     Map<Long, Set<Long>> parentIdToChildId = new ConcurrentHashMap<>();
 
     @Override
     public Set<Long> findTransactionIdsForType(String type) {
-        AtomicReference<Set<Long>> idsSnapshot = new AtomicReference<>(Set.of());
-        typesToTransaction.compute(type, (k, s) -> {
-            idsSnapshot.set(Set.copyOf(s));
-            return s;
+
+        AtomicReference<Set<Long>> idsRef = new AtomicReference<>(Collections.emptySet());
+        typesToTransaction.compute(type, (key, set) -> {
+            idsRef.set(Set.copyOf(set));
+            return set;
         });
-        return idsSnapshot.get();
+        return idsRef.get();
+
     }
 
     @Override
     public Optional<BigDecimal> calculateChildSum(long transactionId) {
 
-        // ID nunca va a cambiar
+        // ID nunca va a cambiar, no hace falta lock
         Transaction tx = idToTransaction.get(transactionId);
-
         if (tx == null) {
             return Optional.empty();
         }
@@ -67,17 +75,28 @@ public class InMemoryTransactionRepository implements TransactionRepository {
             if (!visitedTransactionIds.add(currentId))
                 continue;
 
-            Transaction t = idToTransaction.get(currentId);
-            sum = sum.add(t.getAmount());
+            ReentrantLock currentTxLock = takeLockFor(currentId);
 
-            AtomicReference<Set<Long>> childrenIdsSnapshot = new AtomicReference<>(Set.of());
+            currentTxLock.lock();
 
-            parentIdToChildId.compute(t.getId(), (key, set) -> {
-                childrenIdsSnapshot.set(Set.copyOf(set));
-                return set;
-            });
+            BigDecimal currentAmount;
+            Set<Long> childSnapshot;
+            try {
+                Transaction t = idToTransaction.get(currentId);
+                currentAmount = t.getAmount();
+                AtomicReference<Set<Long>> childrenIdsSnapshot = new AtomicReference<>(Set.of());
 
-            childrenIdsSnapshot.get().forEach(stack::push);
+                parentIdToChildId.compute(t.getId(), (key, set) -> {
+                    childrenIdsSnapshot.set(Set.copyOf(set));
+                    return set;
+                });
+                childSnapshot = childrenIdsSnapshot.get();
+            } finally {
+                currentTxLock.unlock();
+            }
+
+            sum = sum.add(currentAmount);
+            childSnapshot.forEach(stack::push);
         }
 
         return Optional.of(sum);
@@ -86,82 +105,150 @@ public class InMemoryTransactionRepository implements TransactionRepository {
 
     @Override
     public Optional<Transaction> findById(long transactionId) {
-        return Optional.ofNullable(idToTransaction.get(transactionId));
+
+        ReentrantLock lock = takeLockFor(transactionId);
+        lock.lock();
+        try {
+            return Optional.ofNullable(idToTransaction.get(transactionId));
+        } finally {
+            lock.unlock();
+        }
     }
 
-    private void throwInvalidTxExceptionIfParentIdNotExists(Transaction transaction) {
+    private void throwTxExceptionIfNoParentId(Transaction transaction) {
         if (transaction.getParentTransactionId() != null
-                && !parentIdToChildId.containsKey(transaction.getParentTransactionId())) {
+                && !idToTransaction.containsKey(transaction.getParentTransactionId())) {
             throw new InvalidTransactionException(InvalidTransactionCodes.ERR_NONEXISTENT_PARENT_TRANSACTION);
         }
     }
 
-    @Override
-    public Transaction saveTransaction(Transaction transaction) {
-        // Primero aseguramos existencia de transaccion padre,funciona aprovechando que
-        // un ID no se puede modificar una vez creado.
-        throwInvalidTxExceptionIfParentIdNotExists(transaction);
-
-        return idToTransaction.compute(transaction.getId(), (key, oldTx) -> {
-            if (oldTx == null) {
-                return createNewTransaction(transaction);
-            }
-            return updateTransaction(transaction, oldTx);
-        });
-
+    private void throwTxExceptionIfInvalidType(Transaction transaction) {
+        // validate early
+        if (!validTypes.contains(transaction.getType())) {
+            throw new InvalidTransactionException(InvalidTransactionCodes.ERR_NONEXISTENT_TYPE);
+        }
     }
 
+    private ReentrantLock takeLockFor(long txId) {
+        return locksPerId.computeIfAbsent(txId, k -> new ReentrantLock());
+    }
 
-    private Transaction updateTransaction(Transaction newTransaction, Transaction oldTransaction) {
+    @Override
+    public Transaction saveTransaction(Transaction transaction) {
+        throwTxExceptionIfNoParentId(transaction);
+        throwTxExceptionIfInvalidType(transaction);
+
+        long currentTransactionId = transaction.getId();
+        Long newParent = transaction.getParentTransactionId();
+
+        // Se necesita tomar mutex en orden ascendente
+        for (;;) {
+            Long peekedOldParent = Optional.ofNullable(idToTransaction.get(transaction.getId()))
+                    .map(Transaction::getParentTransactionId).orElse(null);
+
+            List<ReentrantLock> acquiredLocks = acquireLocksInOrder(Arrays.asList(currentTransactionId, newParent, peekedOldParent));
+            try {
+                Long actualOldParent = Optional.ofNullable(idToTransaction.get(currentTransactionId))
+                        .map(Transaction::getParentTransactionId)
+                        .orElse(null);
+
+                if (!Objects.equals(peekedOldParent, actualOldParent)) {
+                    releaseLocksInReverseOrder(acquiredLocks);
+                    continue;
+                }
+                // Una vez que tenemos todos los mutex en forma ascendente podemos actualizar la
+                // transaccion
+
+                Transaction oldTransaction = idToTransaction.put(transaction.getId(), transaction);
+                if (oldTransaction == null) {
+                    createNewTransaction(transaction);
+                } else {
+                    updateTransaction(transaction, oldTransaction);
+                }
+
+                return oldTransaction;
+            } finally {
+                releaseLocksInReverseOrder(acquiredLocks);
+            }
+
+        }
+    }
+
+    private void updateTransaction(Transaction newTransaction, Transaction oldTransaction) {
+        removeTransactionFromType(oldTransaction);
+        addTransactionType(newTransaction);
 
         if (oldTransaction.getParentTransactionId() != null) {
-            parentIdToChildId.compute(oldTransaction.getParentTransactionId(), (key, set) -> {
-                set.remove(oldTransaction.getId());
-                return set;
-            });
+            removeTransactionFromParentLink(oldTransaction);
         }
 
         if (newTransaction.getParentTransactionId() != null) {
-            parentIdToChildId.compute(newTransaction.getParentTransactionId(), (key, set) -> {
-                set.add(newTransaction.getId());
-                return set;
-            });
+            addTransactionToParentLink(newTransaction);
         }
-
-        typesToTransaction.compute(oldTransaction.getType(), (key, set) -> {
-            set.remove(oldTransaction.getId());
-            return set;
-        });
-
-        typesToTransaction.compute(newTransaction.getType(), (key, set) -> {
-            set.add(newTransaction.getId());
-            return set;
-        });
-
-        return newTransaction;
     }
 
+    private void initializeChildLinks(Transaction transaction){
+        parentIdToChildId.putIfAbsent(transaction.getId(), new HashSet<>());
+    }
 
-    
+    private void createNewTransaction(Transaction transaction) {
+        addTransactionType(transaction);
+        initializeChildLinks(transaction);
+        if (transaction.getParentTransactionId() != null) {
+            addTransactionToParentLink(transaction);
+        }
+    }
 
-    private Transaction createNewTransaction(Transaction transaction) {
-        parentIdToChildId.computeIfAbsent(transaction.getId(), k -> new HashSet<>());// No hace falta que este sea
-                                                                                     // concurrente, solo 1 acceso
-                                                                                     // siempre, lo proteje la key padre
+    private void removeTransactionFromType(Transaction transaction) {
+        typesToTransaction.compute(transaction.getType(), (key, set) -> {
+            set.remove(transaction.getId());
+            return set;
+        });
+    }
 
-        typesToTransaction.compute(transaction.getType(), (type, idSet) -> {
-            idSet.add(transaction.getId());
-            return idSet;
+    private void removeTransactionFromParentLink(Transaction transaction) {
+        parentIdToChildId.compute(transaction.getParentTransactionId(), (key, set) -> {
+            set.remove(transaction.getId());
+            return set;
         });
 
-        if ((transaction.getParentTransactionId() != null)) {
-            parentIdToChildId.compute(transaction.getParentTransactionId(), (id, set) -> {
-                set.add(transaction.getId());
-                return set;
-            });
-        }
+    }
 
-        return transaction;
+    private void addTransactionType(Transaction transaction) {
+        typesToTransaction.compute(transaction.getType(), (key, set) -> {
+            set.add(transaction.getId());
+            return set;
+        });
+    }
+
+    private void addTransactionToParentLink(Transaction transaction) {
+        parentIdToChildId.compute(transaction.getParentTransactionId(), (key, set) -> {
+            set.add(transaction.getId());
+            return set;
+        });
+
+    }
+
+    private List<ReentrantLock> acquireLocksInOrder(Collection<Long> ids) {
+        List<Long> order = ids.stream()
+                .filter(Objects::nonNull)
+                .distinct()
+                .sorted()
+                .toList();
+
+        List<ReentrantLock> acquired = new ArrayList<>(order.size());
+        for (Long id : order) {
+            ReentrantLock l = takeLockFor(id);
+            l.lock();
+            acquired.add(l);
+        }
+        return acquired;
+    }
+
+    private void releaseLocksInReverseOrder(List<ReentrantLock> locks) {
+        for (int i = locks.size() - 1; i >= 0; i--) {
+            locks.get(i).unlock();
+        }
     }
 
 }
