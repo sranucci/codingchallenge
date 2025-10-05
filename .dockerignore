@@ -1,0 +1,23 @@
+# Maven build outputs
+target
+*/target
+
+# IDE & OS files
+.idea
+.vscode
+*.iml
+*.log
+*.class
+*.jar
+*.war
+*.ear
+.DS_Store
+
+# Git
+.git
+.gitignore
+
+# Temporary files
+*.tmp
+*.swp
+*.bak

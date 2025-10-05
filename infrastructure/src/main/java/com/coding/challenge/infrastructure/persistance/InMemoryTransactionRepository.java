@@ -19,20 +19,17 @@ import com.coding.challenge.domain.transaction.Transaction;
 import com.coding.challenge.domain.transaction.TransactionRepository;
 import com.coding.challenge.domain.transaction.exceptions.InvalidTransactionCodes;
 import com.coding.challenge.domain.transaction.exceptions.InvalidTransactionException;
-import com.coding.challenge.domain.transaction.providers.ValidTransactionTypeProvider;
 import com.coding.challenge.infrastructure.common.ValidTransactionTypeProps;
 
 @Repository
 public class InMemoryTransactionRepository implements TransactionRepository {
 
 
-    private Set<String> allowedTypes;
 
     public InMemoryTransactionRepository(ValidTransactionTypeProps props) {
         for (String type : props.allowedTypes()) {
             typesToTransaction.put(type, new HashSet<>());
         }
-        this.allowedTypes = props.allowedTypes();
     }
 
     Map<Long, Transaction> idToTransaction = new ConcurrentHashMap<>();
@@ -101,7 +98,6 @@ public class InMemoryTransactionRepository implements TransactionRepository {
 
     @Override
     public Transaction saveTransaction(Transaction transaction) {
-
         // Primero aseguramos existencia de transaccion padre,funciona aprovechando que
         // un ID no se puede modificar una vez creado.
         throwInvalidTxExceptionIfParentIdNotExists(transaction);
@@ -114,6 +110,7 @@ public class InMemoryTransactionRepository implements TransactionRepository {
         });
 
     }
+
 
     private Transaction updateTransaction(Transaction newTransaction, Transaction oldTransaction) {
 
@@ -144,6 +141,9 @@ public class InMemoryTransactionRepository implements TransactionRepository {
         return newTransaction;
     }
 
+
+    
+
     private Transaction createNewTransaction(Transaction transaction) {
         parentIdToChildId.computeIfAbsent(transaction.getId(), k -> new HashSet<>());// No hace falta que este sea
                                                                                      // concurrente, solo 1 acceso
@@ -162,7 +162,6 @@ public class InMemoryTransactionRepository implements TransactionRepository {
         }
 
         return transaction;
-
     }
 
 }

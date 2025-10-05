@@ -12,13 +12,11 @@ public record PutTransactionRequest(
     @NotNull(message = "amount is required")
     @DecimalMin(value = "0.0", inclusive = false, message = "amount must be > 0")
     @Schema(description = "Transaction amount", example = "5000.75")
-    @JsonProperty("amount")
     BigDecimal amount,
 
     @NotBlank(message = "type is required")
     @Size(max = 64, message = "type max length is 64")
     @Schema(description = "Business type/category of the transaction", example = "cars")
-    @JsonProperty("type")
     String type,
 
     @Positive(message = "parent_id must be > 0")

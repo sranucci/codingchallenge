@@ -29,7 +29,7 @@ public class CreateTransactionUseCaseImpl implements CreateTransactionUseCase {
             throw new InvalidTransactionException(InvalidTransactionCodes.ERR_NONEXISTENT_TYPE);
         }
 
-        if (transactionRepository.findById(request.getId()).isEmpty()){
+        if (request.getParentTransactionId() != null && transactionRepository.findById(request.getId()).isEmpty()){
             throw new InvalidTransactionException(InvalidTransactionCodes.ERR_NONEXISTENT_PARENT_TRANSACTION);
         }
 

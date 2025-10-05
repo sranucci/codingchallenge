@@ -8,8 +8,7 @@ import org.springframework.context.annotation.Configuration;
 
 import com.coding.challenge.infrastructure.common.ValidTransactionTypeProps;
 
-import lombok.AllArgsConstructor;
-import lombok.Getter;
+
 import lombok.Setter;
 
 @Configuration

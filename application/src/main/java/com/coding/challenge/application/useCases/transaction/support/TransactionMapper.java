@@ -7,6 +7,7 @@ import com.coding.challenge.domain.transaction.Transaction;
 import com.coding.challenge.domain.useCases.transaction.createTransaction.CreateTransactionRequest;
 
 
+@Mapper
 public interface TransactionMapper {
 
     public static final TransactionMapper MAPPER = Mappers.getMapper(TransactionMapper.class);
