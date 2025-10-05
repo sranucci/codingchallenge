@@ -25,7 +25,6 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 
 import com.coding.challenge.domain.transaction.Transaction;
 import com.coding.challenge.domain.transaction.TransactionRepository;
-import com.coding.challenge.domain.useCases.transaction.createTransaction.CreateTransactionUseCase;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 public class TransactionEndpointsTests {
