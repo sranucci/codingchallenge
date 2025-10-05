@@ -23,19 +23,20 @@ public class CreateTransactionUseCaseImpl implements CreateTransactionUseCase {
     private final TransactionRepository transactionRepository;
 
     @Override
-    public Transaction createTransaction(CreateTransactionRequest request) {
+    public boolean createTransaction(CreateTransactionRequest request) {
 
         if (!validTransactionTypesService.getValidTransactionTypes().contains(request.getType())){
             throw new InvalidTransactionException(InvalidTransactionCodes.ERR_NONEXISTENT_TYPE);
         }
 
-        if (request.getParentTransactionId() != null && transactionRepository.findById(request.getId()).isEmpty()){
+        if (request.getParentTransactionId() != null && transactionRepository.findById(request.getParentTransactionId()).isEmpty()){
             throw new InvalidTransactionException(InvalidTransactionCodes.ERR_NONEXISTENT_PARENT_TRANSACTION);
         }
 
         Transaction transaction = TransactionMapper.MAPPER.toTransaction(request);
+        Transaction oldTransaction = transactionRepository.saveTransaction(transaction);
 
-        return transactionRepository.saveTransaction(transaction);
+        return oldTransaction == null;
     }
 
     

@@ -15,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.*;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import com.coding.challenge.api.common.dtos.response.StatusOkResponse;
 import com.coding.challenge.api.transactionEndpoints.dtos.requests.PutTransactionRequest;
@@ -24,7 +25,10 @@ import com.coding.challenge.domain.useCases.transaction.createTransaction.Create
 import com.coding.challenge.domain.useCases.transaction.findSumById.FindChildTransactionsSumUseCase;
 import com.coding.challenge.domain.useCases.transaction.findTransactionsByType.FindTransactionIdsByTypeUseCase;
 
+import java.math.BigDecimal;
+import java.net.URI;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 
@@ -53,29 +57,32 @@ public class TransactionController implements TransactionEndpointsDocumentation 
     }
 
     @Override
-    public GetTransactionSumResponse getSum(long transactionId) {
-        return null;
+    public ResponseEntity<GetTransactionSumResponse> getSum(long transactionId) {
+
+        Optional<BigDecimal> maybeSum = findChildTransactionsSumUseCase.findTransitiveSum(transactionId);
+        if (maybeSum.isEmpty()){
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(new GetTransactionSumResponse(maybeSum.get()));
     }
 
     @Override
     public ResponseEntity<StatusOkResponse> putTransaction(long transactionId,PutTransactionRequest req) {
         CreateTransactionRequest saveTxReq = TransactionDtosMapper.MAPPER.toCreateTransactionRequest(req, transactionId);
-        createTransactionUseCase.createTransaction(saveTxReq);
-        return ResponseEntity.ok(StatusOkResponse.ok());
+        boolean isUpdated = createTransactionUseCase.createTransaction(saveTxReq);
+        if (isUpdated){
+            return ResponseEntity.ok(StatusOkResponse.ok());
+        }
+
+        URI location = ServletUriComponentsBuilder
+                .fromCurrentRequest()
+                .build()
+                .toUri();
+        return ResponseEntity.status(HttpStatus.CREATED)
+        .location(location)
+        .body(StatusOkResponse.ok());
     }
 
     
-    // @GetMapping("/sum/{transaction_id}")
-    // @Override
-    // public GetTransactionSumResponse getSum(@PathVariable("transaction_id") @Min(1) long transactionId) {
-    //     // TODO Auto-generated method stub
-    //     return null;
-    // }
-
-    // @GetMapping("/types/{type}")
-    // @Override
-    // public List<Long> getTransactionIdsByType(@NotBlank @Size(max = 64) String type) {
-    //     // TODO Auto-generated method stub
-    //     return null;
-    // }
+    
 }

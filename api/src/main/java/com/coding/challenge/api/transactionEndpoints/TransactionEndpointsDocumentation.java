@@ -53,6 +53,6 @@ public interface TransactionEndpointsDocumentation {
             @ApiResponse(responseCode = "404", description = "Transaction not found", content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ErrorResponse.class)))
     })
     @GetMapping("/sum/{transactionId:\\d+}")
-    GetTransactionSumResponse getSum(
-            @Parameter(description = "Transaction ID to calculate sum for", example = "200") long transactionId);
+    ResponseEntity<GetTransactionSumResponse> getSum(
+            @Parameter(description = "Transaction ID to calculate sum for", example = "200") @PathVariable @Min(1) long transactionId);
 }

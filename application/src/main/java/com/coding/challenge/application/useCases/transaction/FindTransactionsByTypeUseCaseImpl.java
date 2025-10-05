@@ -23,11 +23,9 @@ public class FindTransactionsByTypeUseCaseImpl implements FindTransactionIdsByTy
 
     @Override
     public Set<Long> findIdsByType(String type) {
-
         if (!validTransactionTypesService.getValidTransactionTypes().contains(type)){
             throw new InvalidTransactionException(InvalidTransactionCodes.ERR_NONEXISTENT_TYPE);
         }
-
         return transactionRepository.findTransactionIdsForType(type);
     }
     
