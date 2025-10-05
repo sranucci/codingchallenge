@@ -31,7 +31,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
-
 @RequiredArgsConstructor
 @RestController
 public class TransactionController implements TransactionEndpointsDocumentation {
@@ -40,15 +39,12 @@ public class TransactionController implements TransactionEndpointsDocumentation 
     private final CreateTransactionUseCase createTransactionUseCase;
     private final FindChildTransactionsSumUseCase findChildTransactionsSumUseCase;
 
-
-
-
     @Override
     public ResponseEntity<Set<Long>> getTransactionIdsByType(String type) {
-        
+
         Set<Long> ids = findTransactionIdsByTypeUseCase.findIdsByType(type);
 
-        if (ids.isEmpty()){
+        if (ids.isEmpty()) {
             return ResponseEntity.status(HttpStatus.NO_CONTENT).body(ids);
         }
 
@@ -60,29 +56,31 @@ public class TransactionController implements TransactionEndpointsDocumentation 
     public ResponseEntity<GetTransactionSumResponse> getSum(long transactionId) {
 
         Optional<BigDecimal> maybeSum = findChildTransactionsSumUseCase.findTransitiveSum(transactionId);
-        if (maybeSum.isEmpty()){
+        if (maybeSum.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
         return ResponseEntity.ok(new GetTransactionSumResponse(maybeSum.get()));
     }
 
     @Override
-    public ResponseEntity<StatusOkResponse> putTransaction(long transactionId,PutTransactionRequest req) {
-        CreateTransactionRequest saveTxReq = TransactionDtosMapper.MAPPER.toCreateTransactionRequest(req, transactionId);
-        boolean isUpdated = createTransactionUseCase.createTransaction(saveTxReq);
-        if (isUpdated){
-            return ResponseEntity.ok(StatusOkResponse.ok());
+    public ResponseEntity<StatusOkResponse> putTransaction(long transactionId, PutTransactionRequest req) {
+        CreateTransactionRequest saveTxReq = TransactionDtosMapper.MAPPER.toCreateTransactionRequest(req,
+                transactionId);
+
+                
+        boolean isCreated = createTransactionUseCase.createTransaction(saveTxReq);
+        if (isCreated) {
+            URI location = ServletUriComponentsBuilder
+                    .fromCurrentRequest()
+                    .build()
+                    .toUri();
+            return ResponseEntity.status(HttpStatus.CREATED)
+                    .location(location)
+                    .body(StatusOkResponse.ok());
         }
 
-        URI location = ServletUriComponentsBuilder
-                .fromCurrentRequest()
-                .build()
-                .toUri();
-        return ResponseEntity.status(HttpStatus.CREATED)
-        .location(location)
-        .body(StatusOkResponse.ok());
+        return ResponseEntity.ok(StatusOkResponse.ok());
+
     }
 
-    
-    
 }

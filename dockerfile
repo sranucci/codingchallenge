@@ -1,35 +1,40 @@
-# -------- STAGE 1: Build with Maven (JDK 21) --------
+# Buildeo con mvn
 FROM maven:3.9-eclipse-temurin-21 AS build
-
 WORKDIR /workspace
 
+
 COPY pom.xml .
-COPY domain/pom.xml         domain/pom.xml
-COPY application/pom.xml    application/pom.xml
+COPY domain/pom.xml domain/pom.xml
+COPY application/pom.xml application/pom.xml
 COPY infrastructure/pom.xml infrastructure/pom.xml
-COPY api/pom.xml            api/pom.xml
-COPY boot/pom.xml           boot/pom.xml
+COPY api/pom.xml api/pom.xml
+COPY boot/pom.xml boot/pom.xml
 
 RUN mvn -q -B -DskipTests dependency:go-offline
 
-# Codigo fuente
+
 COPY . .
 
-# packageo
 RUN mvn -q -B -DskipTests -pl boot -am package
 
-# jar final
 RUN cp boot/target/*.jar /workspace/app.jar
 
 
-# -------- STAGE 2: Runtime (JRE only) --------
+# Imagen runtime, unicamente JRE
 FROM eclipse-temurin:21-jre AS runtime
 
-# Optional JVM ergonomics for containers
+# usuario no root 
+RUN useradd --system --create-home --uid 10001 appuser
+WORKDIR /app
+
+COPY --from=build --chown=10001:10001 /workspace/app.jar /app/app.jar
+
+# Drop root privileges
+USER appuser
+
+# Sensible JVM defaults for containers, , evita que JVM tome todo, guardamos espacio para threads, os overhead
 ENV JAVA_TOOL_OPTIONS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"
 
-WORKDIR /app
-COPY --from=build /workspace/app.jar /app/app.jar
-
 EXPOSE 8080
+
 ENTRYPOINT ["java","-jar","/app/app.jar"]
